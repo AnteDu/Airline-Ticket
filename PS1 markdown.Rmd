@@ -1,0 +1,131 @@
+---
+title: "PS1 markdown"
+author: "Ante Du"
+date: "9/17/2018"
+output: pdf_document
+---
+```{r}
+#get function from package tidyverse, data.table knitr
+suppressMessages(library(tidyverse))
+library(data.table)
+library(knitr)
+```
+1.Bring the data to R
+```{r}
+mydata <- read.csv("/Users/ante/Desktop/Econ690PS1/690PS1/market.csv", sep = ",", header = TRUE)
+str(mydata)
+```
+2.Remove the tickets in three conditions
+```{r}
+#remove ticket carrier change
+#remove ticket that price too low or too high
+#remove ticket that market less than 20 passengers
+mydatas <- filter(mydata, TK_CARRIER_CHANGE ==0)
+mydatab <- filter(mydatas,MARKET_FARE > 25 & MARKET_FARE < 2500)
+mydatac <- 
+  mydatab %>%
+  group_by(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID) %>%
+  mutate(groupSize = n ()) %>%
+  ungroup()
+mydatad <- filter(mydatac, groupSize > 20)
+str(mydatad)
+```
+3.(a) Set market - carrier level dataset
+```{r}
+#for each market airline(each firm,original-destination)
+mydatasMCL <-
+  mydatad %>%
+  group_by(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID,TICKET_CARRIER) %>%
+  summarise(
+    avep = mean (MARKET_FARE),
+    tnp = sum (PASSENGERS),
+    aved = mean(MARKET_DISTANCE)
+)
+str(mydatasMCL)
+
+```
+(b) Set market  level dataset
+```{r}
+#for each market(orginal-destination)
+mydataML <-
+  mydatad %>%
+  group_by(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID) %>%
+  summarise(
+    Avep = mean(MARKET_FARE),
+    Aved = mean(MARKET_DISTANCE),
+    Tnf = length(unique(TICKET_CARRIER))
+)
+#get sum of squared market share
+mydataMCLS <-
+  mydatasMCL %>%
+  group_by(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID) %>%
+  mutate(Ttnp = sum(tnp), Mktshare = tnp/Ttnp *100, HHI = sum(Mktshare^2))
+str(mydataML)
+str(mydataMCLS)
+
+```
+4.Merger two dataset and calculate the size
+```{r}
+load("/Users/ante/Desktop/Econ690PS1/690PS1/populations.R")
+mydatae = merge(populations,mydataML)
+mydatar <-
+  mydatae %>%
+  group_by(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID) %>%
+  mutate(size = (population_origin*population_dest)^(1/2))
+str(mydatar)
+```
+5.Report summary statistics for table
+```{r}
+mydatad %>% select(-c(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID)) %>% summary() %>% kable()
+
+mydatasMCL %>% select(-c(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID,TICKET_CARRIER)) %>% summary() %>% kable()
+
+mydataML %>% select(-c(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID)) %>% summary() %>% kable()
+
+mydataMCLS %>% select(-c(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID)) %>% summary() %>% kable()
+
+mydatar %>% select(-c(ORIGIN_AIRPORT_ID,DEST_AIRPORT_ID)) %>% summary() %>% kable()
+
+```
+6. generate scatter and density ggplot
+```{r}
+mydataMCLS %>% ggplot(aes(x = HHI, y = avep)) +
+  geom_point() +
+  ggtitle("scatter plot of HHI versus prices level") +
+  xlab("HHI") +
+  ylab("Prices level") +
+  theme_bw()
+
+mydataML %>% ggplot(aes(x = Avep)) +
+  geom_density() +
+  ggtitle("density plots of market level prices") +
+  xlab("market level prices") +
+  theme_bw()
+
+mydataMCLS %>% ggplot(aes(x = HHI)) +
+  geom_density() +
+  ggtitle("density plots of HHI") +
+  xlab("HHI") +
+  theme_bw()
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
